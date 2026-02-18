@@ -119,8 +119,46 @@ def main() -> None:
     elif convert_clicked:
         st.error("Please enter a repository URL.")
 
+    # Show previous result after rerun (e.g. download button click)
+    if not convert_clicked and "result" in st.session_state:
+        _show_result(st.session_state["result"])
+
     # --- Heartbeat: shut down when the browser tab closes ---
     _inject_shutdown_heartbeat()
+
+
+def _show_result(result: dict) -> None:
+    """Display download button and preview from a stored result."""
+    markdown_output = result["markdown"]
+    filename = result["filename"]
+    errors = result["errors"]
+
+    if errors:
+        with st.expander(f"⚠ {len(errors)} errors", expanded=False):
+            for err in errors:
+                st.text(err)
+
+    st.download_button(
+        label="Download Markdown",
+        data=markdown_output,
+        file_name=filename,
+        mime="text/markdown",
+        use_container_width=True,
+    )
+
+    _PREVIEW_MAX_LINES = 1000
+    preview_lines = markdown_output.split("\n")
+    with st.expander("Preview", expanded=True):
+        if len(preview_lines) > _PREVIEW_MAX_LINES:
+            truncated = "\n".join(preview_lines[:_PREVIEW_MAX_LINES])
+            st.code(truncated, language="markdown")
+            st.caption(
+                f"Preview is truncated to {_PREVIEW_MAX_LINES:,} lines "
+                f"(total {len(preview_lines):,} lines). "
+                "Download the file for the full content."
+            )
+        else:
+            st.code(markdown_output, language="markdown")
 
 
 def _run_conversion(
@@ -190,39 +228,18 @@ def _run_conversion(
 
         progress_bar.progress(1.0, text="Done!")
 
-        # Show errors if any
-        if progress.errors:
-            with st.expander(f"⚠ {len(progress.errors)} errors", expanded=False):
-                for err in progress.errors:
-                    st.text(err)
-
         # Render Markdown
         markdown_output = render_markdown(repo_display, files)
-
-        # Download button
         filename = f"{repo_info.owner}_{repo_info.repo}.md"
-        st.download_button(
-            label="Download Markdown",
-            data=markdown_output,
-            file_name=filename,
-            mime="text/markdown",
-            use_container_width=True,
-        )
 
-        # Preview (truncate to avoid browser stack overflow)
-        _PREVIEW_MAX_LINES = 1000
-        preview_lines = markdown_output.split("\n")
-        with st.expander("Preview", expanded=True):
-            if len(preview_lines) > _PREVIEW_MAX_LINES:
-                truncated = "\n".join(preview_lines[:_PREVIEW_MAX_LINES])
-                st.code(truncated, language="markdown")
-                st.caption(
-                    f"Preview is truncated to {_PREVIEW_MAX_LINES:,} lines "
-                    f"(total {len(preview_lines):,} lines). "
-                    "Download the file for the full content."
-                )
-            else:
-                st.code(markdown_output, language="markdown")
+        # Save result to session state so it survives reruns
+        st.session_state["result"] = {
+            "markdown": markdown_output,
+            "filename": filename,
+            "errors": progress.errors,
+        }
+
+        _show_result(st.session_state["result"])
 
     except RateLimitError as exc:
         st.error(str(exc))
