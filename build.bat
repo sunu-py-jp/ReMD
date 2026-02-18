@@ -3,10 +3,10 @@ REM ----------------------------------------------------------
 REM ReMD — Windows build script
 REM
 REM Usage:
-REM   build.bat をダブルクリック、または コマンドプロンプトで実行
+REM   Double-click build.bat or run from Command Prompt.
 REM
-REM Python 3.10 以上が必要です。
-REM 依存パッケージは自動でインストールされます。
+REM Requires Python 3.10 or later.
+REM Dependencies are installed automatically.
 REM ----------------------------------------------------------
 cd /d "%~dp0"
 
@@ -29,8 +29,8 @@ if %errorlevel% equ 0 (
     goto :found
 )
 
-echo Error: Python が見つかりません。
-echo Python 3.10 以上をインストールしてください。
+echo Error: Python not found.
+echo Please install Python 3.10 or later.
 echo https://www.python.org/downloads/
 pause
 exit /b 1
@@ -44,11 +44,11 @@ echo.
 
 if %errorlevel% neq 0 (
     echo.
-    echo ビルドに失敗しました。上のエラーメッセージを確認してください。
+    echo Build failed. Please check the error messages above.
     pause
     exit /b 1
 )
 
 echo.
-echo ビルド完了！ dist\ReMD\ReMD.exe を実行してください。
+echo Build complete! Run dist\ReMD\ReMD.exe to start.
 pause
