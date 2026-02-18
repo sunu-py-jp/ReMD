@@ -209,9 +209,20 @@ def _run_conversion(
             use_container_width=True,
         )
 
-        # Preview
+        # Preview (truncate to avoid browser stack overflow)
+        _PREVIEW_MAX_LINES = 1000
+        preview_lines = markdown_output.split("\n")
         with st.expander("Preview", expanded=True):
-            st.code(markdown_output, language="markdown")
+            if len(preview_lines) > _PREVIEW_MAX_LINES:
+                truncated = "\n".join(preview_lines[:_PREVIEW_MAX_LINES])
+                st.code(truncated, language="markdown")
+                st.caption(
+                    f"Preview is truncated to {_PREVIEW_MAX_LINES:,} lines "
+                    f"(total {len(preview_lines):,} lines). "
+                    "Download the file for the full content."
+                )
+            else:
+                st.code(markdown_output, language="markdown")
 
     except RateLimitError as exc:
         st.error(str(exc))
