@@ -19,6 +19,11 @@ st_datas += copy_metadata("streamlit")
 st_datas += copy_metadata("altair")
 st_datas += copy_metadata("packaging")
 
+# Collect keyring and its backends for OS keychain support
+kr_datas, kr_binaries, kr_hiddenimports = collect_all("keyring")
+st_datas += kr_datas + copy_metadata("keyring")
+st_binaries += kr_binaries
+
 a = Analysis(
     [str(project_root / "run.py")],
     pathex=[str(project_root / "src")],
@@ -40,13 +45,16 @@ a = Analysis(
         "ReMD.providers.base",
         "ReMD.providers.github",
         "ReMD.providers.azure_devops",
+        "ReMD.token_store",
         # Streamlit and key dependencies
         "streamlit",
         "streamlit.web",
         "streamlit.web.bootstrap",
         "streamlit.runtime",
         "streamlit.runtime.runtime",
-    ] + st_hiddenimports + collect_submodules("streamlit"),
+    ] + st_hiddenimports + kr_hiddenimports
+    + collect_submodules("streamlit")
+    + collect_submodules("keyring"),
     hookspath=[str(project_root / "hooks")],
     hooksconfig={},
     runtime_hooks=[],

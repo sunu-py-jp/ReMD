@@ -20,6 +20,7 @@ from ReMD.models import ProviderType
 from ReMD.providers.azure_devops import AzureDevOpsError, AzureDevOpsProvider
 from ReMD.providers.github import GitHubError, GitHubProvider, RateLimitError
 from ReMD.url_parser import URLParseError, parse_repo_url
+from ReMD import token_store
 
 
 def _qp(key: str, default: str = "") -> str:
@@ -50,19 +51,43 @@ def main() -> None:
         with st.popover("⋮", use_container_width=True):
             st.subheader("Settings")
 
+            saved_gh = token_store.load("github_token") or ""
             github_token = st.text_input(
                 "GitHub Token (optional)",
-                value=_qp("token"),
+                value=_qp("token") or saved_gh,
                 type="password",
                 help="Required for private repos. Increases rate limit from 60 to 5,000 requests/hour.",
             )
 
+            saved_azdo = token_store.load("azdo_pat") or ""
             azdo_pat = st.text_input(
                 "Azure DevOps PAT (optional)",
-                value=_qp("pat"),
+                value=_qp("pat") or saved_azdo,
                 type="password",
                 help="Required for private Azure DevOps repositories.",
             )
+
+            if token_store.is_available():
+                remember = st.checkbox(
+                    "Save tokens to OS keychain",
+                    value=bool(saved_gh or saved_azdo),
+                    help="Tokens are stored securely in macOS Keychain or Windows Credential Manager.",
+                )
+                if remember:
+                    if github_token:
+                        token_store.save("github_token", github_token)
+                    elif saved_gh:
+                        token_store.delete("github_token")
+                    if azdo_pat:
+                        token_store.save("azdo_pat", azdo_pat)
+                    elif saved_azdo:
+                        token_store.delete("azdo_pat")
+                else:
+                    # Checkbox unchecked — clear any saved tokens
+                    if saved_gh:
+                        token_store.delete("github_token")
+                    if saved_azdo:
+                        token_store.delete("azdo_pat")
 
             default_size = float(_qp("max_size", "1.0"))
             max_file_size_mb = st.number_input(
@@ -254,7 +279,7 @@ def _run_conversion(
     except RateLimitError as exc:
         st.error(str(exc))
         st.info(
-            "Tip: Add a GitHub token in the sidebar to increase your rate limit "
+            "Tip: Add a GitHub token in Settings (⋮) to increase your rate limit "
             "from 60 to 5,000 requests per hour."
         )
     except (GitHubError, AzureDevOpsError) as exc:
