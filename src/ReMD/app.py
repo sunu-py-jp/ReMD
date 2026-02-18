@@ -35,6 +35,12 @@ def main() -> None:
         layout="wide",
     )
 
+    # Hide Streamlit's default toolbar (Deploy, Stop, etc.)
+    st.markdown(
+        "<style>[data-testid='stToolbar'] { display: none; }</style>",
+        unsafe_allow_html=True,
+    )
+
     # --- Header with settings popover ---
     header_left, header_right = st.columns([8, 1])
     with header_left:
