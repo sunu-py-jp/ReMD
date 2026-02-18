@@ -35,39 +35,43 @@ def main() -> None:
         layout="wide",
     )
 
-    st.title("ReMD")
+    # --- Header with settings popover ---
+    header_left, header_right = st.columns([8, 1])
+    with header_left:
+        st.title("ReMD")
+    with header_right:
+        st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
+        with st.popover("⋮", use_container_width=True):
+            st.subheader("Settings")
+
+            github_token = st.text_input(
+                "GitHub Token (optional)",
+                value=_qp("token"),
+                type="password",
+                help="Required for private repos. Increases rate limit from 60 to 5,000 requests/hour.",
+            )
+
+            azdo_pat = st.text_input(
+                "Azure DevOps PAT (optional)",
+                value=_qp("pat"),
+                type="password",
+                help="Required for private Azure DevOps repositories.",
+            )
+
+            default_size = float(_qp("max_size", "1.0"))
+            max_file_size_mb = st.number_input(
+                "Max file size (MB)",
+                min_value=0.1,
+                max_value=100.0,
+                value=min(max(default_size, 0.1), 100.0),
+                step=0.5,
+                help="Files larger than this will be skipped. Set to 0 to include all.",
+            )
+            max_file_size = int(max_file_size_mb * 1_000_000)
+
     st.caption(
         "Convert a GitHub / Azure DevOps repository into a single Markdown file."
     )
-
-    # --- Sidebar: settings ---
-    with st.sidebar:
-        st.header("Settings")
-
-        github_token = st.text_input(
-            "GitHub Token (optional)",
-            value=_qp("token"),
-            type="password",
-            help="Required for private repos. Increases rate limit from 60 to 5,000 requests/hour.",
-        )
-
-        azdo_pat = st.text_input(
-            "Azure DevOps PAT (optional)",
-            value=_qp("pat"),
-            type="password",
-            help="Required for private Azure DevOps repositories.",
-        )
-
-        default_size = float(_qp("max_size", "1.0"))
-        max_file_size_mb = st.number_input(
-            "Max file size (MB)",
-            min_value=0.1,
-            max_value=100.0,
-            value=min(max(default_size, 0.1), 100.0),
-            step=0.5,
-            help="Files larger than this will be skipped. Set to 0 to include all.",
-        )
-        max_file_size = int(max_file_size_mb * 1_000_000)
 
     # --- Main area ---
     url = st.text_input(
