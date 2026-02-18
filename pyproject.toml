@@ -6,6 +6,7 @@ build-backend = "setuptools.backends._legacy:_Backend"
 name = "ReMD"
 version = "1.0.0"
 description = "Convert GitHub/Azure DevOps repositories to a single Markdown file"
+license = "MIT"
 requires-python = ">=3.10"
 dependencies = [
     "streamlit>=1.30.0",
