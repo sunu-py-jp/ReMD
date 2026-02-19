@@ -48,7 +48,7 @@ def main() -> None:
         st.title("ReMD")
     with header_right:
         st.markdown("<div style='height: 1.5rem'></div>", unsafe_allow_html=True)
-        with st.popover("⋮", use_container_width=True):
+        with st.popover("", use_container_width=True):
             st.subheader("Settings")
 
             saved_gh = token_store.load("github_token") or ""
