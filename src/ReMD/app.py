@@ -210,11 +210,13 @@ def _run_conversion(
         st.error(f"Invalid URL: {exc}")
         return
 
-    # Select provider
+    # Select provider (strip tokens to avoid whitespace from copy-paste)
+    gh_token = github_token.strip() or None
+    azdo_token = azdo_pat.strip() or None
     if repo_info.provider == ProviderType.GITHUB:
-        provider = GitHubProvider(token=github_token or None)
+        provider = GitHubProvider(token=gh_token)
     else:
-        provider = AzureDevOpsProvider(pat=azdo_pat or None)
+        provider = AzureDevOpsProvider(pat=azdo_token)
 
     repo_display = f"{repo_info.owner}/{repo_info.repo}"
 
