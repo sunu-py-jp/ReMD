@@ -16,7 +16,7 @@ from pathlib import Path
 
 def _ensure_dependencies() -> None:
     """Install build & runtime dependencies if missing."""
-    deps = ["streamlit", "requests", "pyinstaller"]
+    deps = ["streamlit", "requests", "keyring", "pyinstaller"]
     for dep in deps:
         try:
             __import__(dep if dep != "pyinstaller" else "PyInstaller")
