@@ -128,6 +128,32 @@ class TestFetchFileContent:
         assert content == "print('hi')"
 
 
+class TestAPIErrors:
+    @responses.activate
+    def test_401_raises(self):
+        responses.add(
+            responses.GET,
+            "https://api.github.com/repos/testowner/testrepo",
+            json={"message": "Unauthorized"},
+            status=401,
+        )
+        provider = GitHubProvider()
+        with pytest.raises(GitHubError, match="Authentication failed"):
+            provider.get_default_branch(_repo_info(None))
+
+    @responses.activate
+    def test_403_raises(self):
+        responses.add(
+            responses.GET,
+            "https://api.github.com/repos/testowner/testrepo",
+            json={"message": "Forbidden"},
+            status=403,
+        )
+        provider = GitHubProvider()
+        with pytest.raises(GitHubError, match="Access denied"):
+            provider.get_default_branch(_repo_info(None))
+
+
 class TestRateLimit:
     @responses.activate
     def test_rate_limit_raises(self):
@@ -144,6 +170,84 @@ class TestRateLimit:
         provider = GitHubProvider()
         with pytest.raises(RateLimitError):
             provider.get_default_branch(_repo_info(None))
+
+    def test_rate_limit_error_message(self):
+        err = RateLimitError(reset_at=0)
+        assert "rate limit exceeded" in str(err).lower()
+
+
+class TestListFilesTruncated:
+    @responses.activate
+    def test_truncated_tree_walks_subdirs(self):
+        """When tree is truncated, provider should walk subdirectories."""
+        responses.add(
+            responses.GET,
+            "https://api.github.com/repos/testowner/testrepo/git/trees/main",
+            json={
+                "sha": "root",
+                "truncated": True,
+                "tree": [
+                    {"type": "blob", "path": "README.md", "size": 100},
+                    {"type": "tree", "path": "src", "sha": "src-sha"},
+                ],
+            },
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            "https://api.github.com/repos/testowner/testrepo/git/trees/src-sha",
+            json={
+                "sha": "src-sha",
+                "truncated": False,
+                "tree": [
+                    {"type": "blob", "path": "main.py", "size": 200},
+                ],
+            },
+            status=200,
+        )
+        provider = GitHubProvider()
+        files = provider.list_files(_repo_info())
+        paths = [f.path for f in files]
+        assert "README.md" in paths
+        assert "main.py" in paths
+
+    @responses.activate
+    def test_truncated_tree_continues_on_subdir_error(self):
+        """If a subdirectory fetch fails, it should continue."""
+        responses.add(
+            responses.GET,
+            "https://api.github.com/repos/testowner/testrepo/git/trees/main",
+            json={
+                "sha": "root",
+                "truncated": True,
+                "tree": [
+                    {"type": "blob", "path": "README.md", "size": 100},
+                    {"type": "tree", "path": "bad", "sha": "bad-sha"},
+                ],
+            },
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            "https://api.github.com/repos/testowner/testrepo/git/trees/bad-sha",
+            json={"message": "Not Found"},
+            status=404,
+        )
+        provider = GitHubProvider()
+        files = provider.list_files(_repo_info())
+        # Should still return the root-level file
+        assert len(files) == 1
+        assert files[0].path == "README.md"
+
+
+class TestAuthentication:
+    def test_token_sets_authorization_header(self):
+        provider = GitHubProvider(token="ghp_test123")
+        assert provider.session.headers["Authorization"] == "Bearer ghp_test123"
+
+    def test_no_token_no_authorization_header(self):
+        provider = GitHubProvider()
+        assert "Authorization" not in provider.session.headers
 
 
 class TestFetchAllFiles:
@@ -167,3 +271,65 @@ class TestFetchAllFiles:
         assert final.fetched_files == 3
         assert final.skipped_binary == 2
         assert files[2].content == "x = 1"
+
+    @responses.activate
+    def test_retry_on_failure_then_success(self):
+        """First fetch fails, retry succeeds."""
+        responses.add(
+            responses.GET,
+            "https://raw.githubusercontent.com/testowner/testrepo/main/flaky.py",
+            body=Exception("connection reset"),
+        )
+        responses.add(
+            responses.GET,
+            "https://raw.githubusercontent.com/testowner/testrepo/main/flaky.py",
+            body="recovered",
+            status=200,
+        )
+        provider = GitHubProvider()
+        files = [FileEntry(path="flaky.py", size=9)]
+        results = list(provider.fetch_all_files(_repo_info(), files))
+        assert files[0].content == "recovered"
+        assert results[-1].errors == []
+
+    @responses.activate
+    def test_error_appended_on_double_failure(self):
+        """Both attempts fail, error should be recorded."""
+        responses.add(
+            responses.GET,
+            "https://raw.githubusercontent.com/testowner/testrepo/main/bad.py",
+            body=Exception("fail 1"),
+        )
+        responses.add(
+            responses.GET,
+            "https://raw.githubusercontent.com/testowner/testrepo/main/bad.py",
+            body=Exception("fail 2"),
+        )
+        provider = GitHubProvider()
+        files = [FileEntry(path="bad.py", size=5)]
+        results = list(provider.fetch_all_files(_repo_info(), files))
+        assert len(results[-1].errors) == 1
+        assert "bad.py" in results[-1].errors[0]
+
+    @responses.activate
+    def test_rate_limit_reraised_immediately(self):
+        """RateLimitError should not be retried, it should propagate."""
+        responses.add(
+            responses.GET,
+            "https://raw.githubusercontent.com/testowner/testrepo/main/file.py",
+            status=404,
+        )
+        responses.add(
+            responses.GET,
+            "https://api.github.com/repos/testowner/testrepo/contents/file.py",
+            json={"message": "rate limit"},
+            status=200,
+            headers={
+                "X-RateLimit-Remaining": "0",
+                "X-RateLimit-Reset": "9999999999",
+            },
+        )
+        provider = GitHubProvider()
+        files = [FileEntry(path="file.py", size=5)]
+        with pytest.raises(RateLimitError):
+            list(provider.fetch_all_files(_repo_info(), files))
