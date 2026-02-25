@@ -38,6 +38,38 @@ class TestGitHubURLs:
         info = parse_repo_url("  https://github.com/owner/repo  ")
         assert info.repo == "repo"
 
+    def test_api_host_is_github_com(self):
+        info = parse_repo_url("https://github.com/owner/repo")
+        assert info.api_host == "github.com"
+
+
+class TestGitHubEnterpriseURLs:
+    def test_basic(self):
+        info = parse_repo_url("https://github.mycompany.com/owner/repo")
+        assert info.provider == ProviderType.GITHUB
+        assert info.owner == "owner"
+        assert info.repo == "repo"
+        assert info.api_host == "github.mycompany.com"
+
+    def test_with_branch(self):
+        info = parse_repo_url(
+            "https://github.mycompany.com/owner/repo/tree/main"
+        )
+        assert info.branch == "main"
+        assert info.api_host == "github.mycompany.com"
+
+    def test_dot_git_suffix(self):
+        info = parse_repo_url("https://github.mycompany.com/owner/repo.git")
+        assert info.repo == "repo"
+        assert info.api_host == "github.mycompany.com"
+
+    def test_custom_host(self):
+        info = parse_repo_url("https://git.internal.example.org/team/project")
+        assert info.provider == ProviderType.GITHUB
+        assert info.owner == "team"
+        assert info.repo == "project"
+        assert info.api_host == "git.internal.example.org"
+
 
 class TestAzureDevOpsURLs:
     def test_new_format(self):
@@ -79,9 +111,9 @@ class TestErrors:
         with pytest.raises(URLParseError, match="no scheme"):
             parse_repo_url("github.com/owner/repo")
 
-    def test_unsupported_host(self):
-        with pytest.raises(URLParseError, match="Unsupported host"):
-            parse_repo_url("https://gitlab.com/owner/repo")
+    def test_unknown_host_missing_repo(self):
+        with pytest.raises(URLParseError, match="owner/repo"):
+            parse_repo_url("https://gitlab.com/owner")
 
     def test_github_missing_repo(self):
         with pytest.raises(URLParseError, match="owner/repo"):

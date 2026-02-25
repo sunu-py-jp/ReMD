@@ -18,6 +18,7 @@ class RepoInfo:
     repo: str
     branch: str | None = None
     project: str | None = None  # Azure DevOps only
+    api_host: str = "github.com"
     raw_url: str = ""
 
 

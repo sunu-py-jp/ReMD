@@ -30,10 +30,14 @@ class RateLimitError(GitHubError):
 class GitHubProvider(RepoProvider):
     """Provider for GitHub repositories using the REST API."""
 
-    API_BASE = "https://api.github.com"
-    RAW_BASE = "https://raw.githubusercontent.com"
+    def __init__(self, token: str | None = None, api_host: str = "github.com"):
+        if api_host == "github.com":
+            self.api_base = "https://api.github.com"
+            self.raw_base = "https://raw.githubusercontent.com"
+        else:
+            self.api_base = f"https://{api_host}/api/v3"
+            self.raw_base = f"https://{api_host}/raw"
 
-    def __init__(self, token: str | None = None):
         self.session = requests.Session()
         self.session.headers["Accept"] = "application/vnd.github+json"
         self.session.headers["User-Agent"] = "ReMD/1.0"
@@ -47,7 +51,7 @@ class GitHubProvider(RepoProvider):
             raise RateLimitError(reset_at)
 
     def _api_get(self, path: str, params: dict | None = None) -> dict:
-        url = f"{self.API_BASE}{path}"
+        url = f"{self.api_base}{path}"
         resp = self.session.get(url, params=params, timeout=30)
         self._check_rate_limit(resp)
 
@@ -148,7 +152,7 @@ class GitHubProvider(RepoProvider):
 
         # Try raw.githubusercontent.com first (fast, no API rate limit)
         raw_url = (
-            f"{self.RAW_BASE}/{repo_info.owner}/{repo_info.repo}"
+            f"{self.raw_base}/{repo_info.owner}/{repo_info.repo}"
             f"/{branch}/{file_entry.path}"
         )
         try:

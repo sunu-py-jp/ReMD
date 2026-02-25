@@ -214,7 +214,7 @@ def _run_conversion(
     gh_token = github_token.strip() or None
     azdo_token = azdo_pat.strip() or None
     if repo_info.provider == ProviderType.GITHUB:
-        provider = GitHubProvider(token=gh_token)
+        provider = GitHubProvider(token=gh_token, api_host=repo_info.api_host)
     else:
         provider = AzureDevOpsProvider(pat=azdo_token)
 

@@ -36,18 +36,17 @@ def parse_repo_url(url: str) -> RepoInfo:
     host = parsed.hostname or ""
     path = parsed.path.strip("/")
 
-    if host == "github.com":
-        return _parse_github(path, url)
-    elif host == "dev.azure.com":
+    if host == "dev.azure.com":
         return _parse_azure_devops_new(path, parsed.query, url)
     elif host.endswith(".visualstudio.com"):
         org = host.removesuffix(".visualstudio.com")
         return _parse_azure_devops_old(org, path, parsed.query, url)
     else:
-        raise URLParseError(f"Unsupported host: {host}")
+        # github.com or GitHub Enterprise (any other host)
+        return _parse_github(path, url, api_host=host)
 
 
-def _parse_github(path: str, raw_url: str) -> RepoInfo:
+def _parse_github(path: str, raw_url: str, api_host: str = "github.com") -> RepoInfo:
     """Parse a GitHub URL path."""
     # path: owner/repo[/tree/branch[/...]]
     parts = path.split("/")
@@ -68,6 +67,7 @@ def _parse_github(path: str, raw_url: str) -> RepoInfo:
         owner=owner,
         repo=repo,
         branch=branch,
+        api_host=api_host,
         raw_url=raw_url,
     )
 
