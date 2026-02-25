@@ -19,10 +19,14 @@ st_datas += copy_metadata("streamlit")
 st_datas += copy_metadata("altair")
 st_datas += copy_metadata("packaging")
 
-# Collect keyring and its backends for OS keychain support
-kr_datas, kr_binaries, kr_hiddenimports = collect_all("keyring")
-st_datas += kr_datas + copy_metadata("keyring")
-st_binaries += kr_binaries
+# Collect keyring metadata and only the platform-relevant backend
+st_datas += copy_metadata("keyring")
+if is_windows:
+    _kr_backend_imports = ["keyring", "keyring.backends", "keyring.backends.Windows"]
+    _kr_backend_excludes = ["keyring.backends.macOS", "keyring.backends.SecretService"]
+else:
+    _kr_backend_imports = ["keyring", "keyring.backends", "keyring.backends.macOS"]
+    _kr_backend_excludes = ["keyring.backends.Windows", "keyring.backends.SecretService"]
 
 a = Analysis(
     [str(project_root / "run.py")],
@@ -52,9 +56,8 @@ a = Analysis(
         "streamlit.web.bootstrap",
         "streamlit.runtime",
         "streamlit.runtime.runtime",
-    ] + st_hiddenimports + kr_hiddenimports
-    + collect_submodules("streamlit")
-    + collect_submodules("keyring"),
+    ] + st_hiddenimports + _kr_backend_imports
+    + collect_submodules("streamlit"),
     hookspath=[str(project_root / "hooks")],
     hooksconfig={},
     runtime_hooks=[],
@@ -71,7 +74,7 @@ a = Analysis(
         "nbformat",
         "black",
         "lxml",
-    ],
+    ] + _kr_backend_excludes,
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
